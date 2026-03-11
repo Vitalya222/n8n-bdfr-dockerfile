@@ -16,15 +16,20 @@ def download_image():
         return jsonify({'error': 'URL not provided'}), 400
 
     with tempfile.TemporaryDirectory() as tmpdir:
+        # Создаём поддиректорию внутри временной папки
+        download_dir = Path(tmpdir) / 'downloads'
+        download_dir.mkdir(exist_ok=True)
+        
         try:
             subprocess.run([
-                'bdfr', 'download', tmpdir,
+                'bdfr', 'download', str(download_dir),
                 '--link', post_url,
                 '--file-scheme', '{POSTID}',
                 '--no-dupes'
             ], check=True, capture_output=True, timeout=30)
 
-            files = list(Path(tmpdir).glob('*'))
+            # Ищем любой файл в папке
+            files = list(download_dir.glob('*'))
             if not files:
                 return jsonify({'error': 'No file downloaded'}), 500
 
@@ -39,4 +44,5 @@ def download_image():
             return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
