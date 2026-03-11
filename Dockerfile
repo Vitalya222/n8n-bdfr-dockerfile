@@ -1,8 +1,15 @@
-FROM n8nio/n8n:alpine
+FROM python:3.12-slim
 
-USER root
-RUN apk add --no-cache python3 py3-pip
-RUN pip3 install --no-cache-dir bdfr --upgrade
+WORKDIR /app
 
-USER node
-CMD ["n8n"]
+# Копируем requirements.txt и устанавливаем зависимости
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копируем весь код приложения
+COPY . .
+
+# Создаём нужные файлы внутри контейнера (если надо)
+RUN echo "some content" > /app/data/config.txt
+
+CMD ["python", "app.py"]
