@@ -2,14 +2,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Копируем requirements.txt и устанавливаем зависимости
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем весь код приложения
-COPY . .
+# Если папка data не нужна — удали эти строки
+# Если нужна — сначала создай директорию
+RUN mkdir -p /app/data
+# RUN echo "some content" > /app/data/config.txt
 
-# Создаём нужные файлы внутри контейнера (если надо)
-RUN echo "some content" > /app/data/config.txt
+COPY . .
 
 CMD ["python", "app.py"]
