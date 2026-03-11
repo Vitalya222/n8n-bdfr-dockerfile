@@ -1,8 +1,6 @@
-import subprocess
+import requests
 import base64
-import tempfile
 import os
-from pathlib import Path
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -15,33 +13,23 @@ def download_image():
     if not post_url:
         return jsonify({'error': 'URL not provided'}), 400
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Создаём поддиректорию внутри временной папки
-        download_dir = Path(tmpdir) / 'downloads'
-        download_dir.mkdir(exist_ok=True)
-        
-        try:
-            subprocess.run([
-                'bdfr', 'download', str(download_dir),
-                '--link', post_url,
-                '--file-scheme', '{POSTID}',
-                '--no-dupes'
-            ], check=True, capture_output=True, timeout=30)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'https://www.reddit.com/'
+    }
 
-            # Ищем любой файл в папке
-            files = list(download_dir.glob('*'))
-            if not files:
-                return jsonify({'error': 'No file downloaded'}), 500
+    try:
+        # Скачиваем картинку
+        response = requests.get(post_url, headers=headers, timeout=15)
+        response.raise_for_status()
 
-            with open(files[0], 'rb') as f:
-                img_base64 = base64.b64encode(f.read()).decode('utf-8')
+        # Конвертируем в base64
+        image_base64 = base64.b64encode(response.content).decode('utf-8')
 
-            return jsonify({'image': img_base64})
+        return jsonify({'image': image_base64})
 
-        except subprocess.CalledProcessError as e:
-            return jsonify({'error': f'bdfr failed: {e.stderr.decode()}'}), 500
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': f'Failed to download: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
