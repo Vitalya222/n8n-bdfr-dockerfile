@@ -5,32 +5,37 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
+# Создаём сессию с браузерными заголовками
+session = requests.Session()
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"macOS"',
+    'Sec-Fetch-Dest': 'image',
+    'Sec-Fetch-Mode': 'no-cors',
+    'Sec-Fetch-Site': 'cross-site'
+})
+
 @app.route('/download', methods=['POST'])
 def download_image():
     data = request.get_json()
-    post_url = data.get('url')
+    image_url = data.get('url')
 
-    if not post_url:
+    if not image_url:
         return jsonify({'error': 'URL not provided'}), 400
 
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://www.reddit.com/',
-        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"macOS"',
-        'Sec-Fetch-Dest': 'image',
-        'Sec-Fetch-Mode': 'no-cors',
-        'Sec-Fetch-Site': 'cross-site'
-    }
-
     try:
-        response = requests.get(post_url, headers=headers, timeout=15)
+        # Сначала заходим на главную Reddit, чтобы получить куки
+        session.get('https://www.reddit.com', timeout=10)
+        
+        # Теперь качаем картинку с правильным referer
+        response = session.get(image_url, headers={'Referer': 'https://www.reddit.com'}, timeout=15)
         response.raise_for_status()
         
-        # Проверяем, что вернулось изображение, а не HTML
+        # Проверяем, что это картинка
         content_type = response.headers.get('content-type', '')
         if 'text/html' in content_type:
             return jsonify({'error': 'Reddit returned HTML block page'}), 500
