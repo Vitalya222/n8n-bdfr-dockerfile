@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Создаём сессию с браузерными заголовками
+# Сессия с браузерными заголовками
 session = requests.Session()
 session.headers.update({
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -13,25 +13,20 @@ session.headers.update({
     'Accept-Language': 'en-US,en;q=0.9',
     'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
     'Sec-Ch-Ua-Mobile': '?0',
-    'Sec-Ch-Ua-Platform': '"macOS"',
-    'Sec-Fetch-Dest': 'image',
-    'Sec-Fetch-Mode': 'no-cors',
-    'Sec-Fetch-Site': 'cross-site'
+    'Sec-Ch-Ua-Platform': '"macOS"'
 })
 
 @app.route('/download', methods=['POST'])
 def download_image():
     data = request.get_json()
     image_url = data.get('url')
+    post_data = data.get('post', {})  # ожидаем, что n8n передаст и данные поста
 
     if not image_url:
         return jsonify({'error': 'URL not provided'}), 400
 
     try:
-        # Сначала заходим на главную Reddit, чтобы получить куки
-        session.get('https://www.reddit.com', timeout=10)
-        
-        # Теперь качаем картинку с правильным referer
+        # Качаем картинку
         response = session.get(image_url, headers={'Referer': 'https://www.reddit.com'}, timeout=15)
         response.raise_for_status()
         
@@ -41,7 +36,18 @@ def download_image():
             return jsonify({'error': 'Reddit returned HTML block page'}), 500
             
         image_base64 = base64.b64encode(response.content).decode('utf-8')
-        return jsonify({'image': image_base64})
+        
+        # Возвращаем и картинку, и данные поста
+        return jsonify({
+            'image': image_base64,
+            'id': post_data.get('id'),
+            'title': post_data.get('title'),
+            'url': post_data.get('url'),
+            'subreddit': post_data.get('subreddit'),
+            'score': post_data.get('score'),
+            'created': post_data.get('created'),
+            'permalink': post_data.get('permalink')
+        })
 
     except requests.exceptions.RequestException as e:
         return jsonify({'error': f'Failed to download: {str(e)}'}), 500
